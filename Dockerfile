@@ -22,9 +22,11 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install
-RUN npx prisma generate
+
 
 COPY . .
+
+RUN npx prisma generate
 
 RUN pip install manim==0.20.0
 
