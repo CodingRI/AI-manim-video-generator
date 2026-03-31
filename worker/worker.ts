@@ -7,7 +7,7 @@ const worker = new Worker(
   "video-queue",
   async (job) => {
     const { jobId } = job.data;
-
+    console.log("Processing job:", jobId);
     try {
       await prisma.videoJob.update({
         where: { id: jobId },
@@ -20,9 +20,10 @@ const worker = new Worker(
         where: { id: jobId },
         data: {
           status: "completed",
-          result,
+          videoUrl: result.videoUrl,
         },
       });
+      console.log("Job completed:", jobId);
 
       console.log("Final video", result);
 

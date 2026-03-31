@@ -18,6 +18,10 @@ export function cleanCode(input: string): string {
 
       code = code.replace(/MathTex\((.*?)\)/g, "Text($1)");
       code = code.replace(/r"(.*?)"/g, '"$1"');
+
+      if (!code.includes("from manim import")) {
+        code = "from manim import *\n" + code;
+      }
     
       return code;
   }

@@ -2,12 +2,12 @@ import NextAuth from "next-auth/next";
 import GoogleProvider from "next-auth/providers/google"
 import GithubProvider from "next-auth/providers/github"
 import CredentialsProvider from "next-auth/providers/credentials";
-
+import { NextAuthOptions } from "next-auth";
 import {PrismaAdapter} from "@next-auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
-const handler = NextAuth({
+export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
     providers: [
         GoogleProvider({
@@ -62,6 +62,8 @@ const handler = NextAuth({
         return session;
       }
     }
-})
+}
+
+const handler = NextAuth(authOptions)
 
 export {handler as GET, handler as POST};

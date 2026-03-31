@@ -30,7 +30,9 @@ model VideoJob {
   status    String
   videoUrl  String?
   result    Json?
+  log       String?
   createdAt DateTime    @default(now())
+  userId    String?
 }
 
 model Account {

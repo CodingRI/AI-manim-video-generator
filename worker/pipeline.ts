@@ -1,17 +1,19 @@
-import { cleanJSON } from "@/lib/cleanCode";
+import { cleanJSON, cleanCode } from "@/lib/cleanCode";
 import { callLLM } from "@/lib/llm";
-import { buildStructuringPrompt, buildScenePrompt } from "@/lib/promptBuilder";
+import { buildStructuringPrompt, buildScenePrompt, buildManimPrompt } from "@/lib/promptBuilder";
 import { ScenesArraySchema } from "@/lib/schema";
 import { generateSceneCode } from "@/lib/template";
 import fs from "fs";
 import path from "path";
+import {prisma} from "@/lib/prisma"
 import { execSync } from "child_process";
 
 export async function runPipeline(data: any) {
   const { prompt } = data;
 
   console.log("Running pipeline for:", prompt);
-
+  let log = "";
+  log += "Starting pipeline\n"
   const structuredPrompt = buildStructuringPrompt(prompt);
   const structRes = await callLLM(structuredPrompt);
   const cleanedStruct = cleanJSON(structRes.content);
@@ -24,6 +26,7 @@ export async function runPipeline(data: any) {
     throw new Error("Structuring JSON failed");
   }
 
+  log += "Structuring completed\n"
   console.log("Structured data:", structuredData);
 
   const scenePrompt = buildScenePrompt(structuredData);
@@ -56,9 +59,13 @@ export async function runPipeline(data: any) {
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
   
-    console.log(`\n---Generating Scene ${i + 1} (deterministic) ---`);
+    console.log(`\n--- Generating Scene ${i + 1} (AI) ---`);
   
-    const code = generateSceneCode(scene, i + 1);
+    const manimPrompt = buildManimPrompt(scene, i + 1);
+    const codeRes = await callLLM(manimPrompt);
+    const code = cleanCode(codeRes.content);
+  
+    console.log(`Scene ${i + 1} code:\n`, code);
   
     const fileName = `scene${i + 1}.py`;
     const filePath = path.join(outputDir, fileName);
@@ -69,6 +76,9 @@ export async function runPipeline(data: any) {
   
     sceneFiles.push(filePath);
   }
+
+  log += "Scenes genrated\n"
+
   const videoPaths: string[] = [];
 
   for (let i = 0; i < sceneFiles.length; i++) {
@@ -89,14 +99,21 @@ export async function runPipeline(data: any) {
 
       videoPaths.push(videoPath);
     } catch (err) {
-      console.error(`Rendering failed for ${sceneName}`);
-      throw err;
+      console.error(`Scene ${sceneName} failed, skipping...`);
+      continue; 
     }
   }
+
+  log += "Rendering complete\n"
+
 
   const concatFilePath = path.join(process.cwd(), "generated", "concat.txt");
 
   let concatContent = "";
+
+  if(videoPaths.length == 0) {
+    throw new Error("All scenes failed, no video generated")
+  }
 
   for (const videoPath of videoPaths) {
     concatContent += `file '${path.resolve(videoPath)}'\n`;
@@ -124,8 +141,16 @@ export async function runPipeline(data: any) {
     throw err;
   }
 
+  log += "Video merge\n"
+
+  await prisma.videoJob.update({
+    where: { id: data.jobId },
+    data: { log },
+  });
+
   return {
     videoUrl: `/videos/${fileName}`,
+    //videoUrl: `/public/final.mp4`,
     structuredData,
     scenes,
     //sceneFiles,
