@@ -22,6 +22,7 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install
+RUN npx prisma generate
 
 COPY . .
 
