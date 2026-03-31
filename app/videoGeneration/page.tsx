@@ -90,6 +90,7 @@ export default function VideoGeneratorPage() {
         clearInterval(interval);
       }
       if (job.status === "failed") {
+        alert("Sorry, there was an issue generating your video.")
         setIsGenerating(false);
         localStorage.removeItem("activeJobId");
         localStorage.setItem("jobStatus", "failed");

@@ -1,7 +1,12 @@
 import { Worker } from "bullmq";
-import { connection } from "@/lib/redis";
+import { connection } from "../lib/redis";
 import { runPipeline } from "./pipeline";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma";
+
+
+interface PipelineResult {
+  videoUrl: string;
+}
 
 const worker = new Worker(
   "video-queue",
@@ -14,7 +19,12 @@ const worker = new Worker(
         data: { status: "processing" },
       });
 
-      const result = await runPipeline(job.data);
+      const result = await Promise.race<PipelineResult>([
+        runPipeline(job.data),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout")), 120000)
+        ),
+      ]);
 
       await prisma.videoJob.update({
         where: { id: jobId },
@@ -28,7 +38,7 @@ const worker = new Worker(
       console.log("Final video", result);
 
     } catch (err) {
-      console.error(err);
+      console.error("Job failed:", jobId, err);
 
       await prisma.videoJob.update({
         where: { id: jobId },
