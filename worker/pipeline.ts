@@ -1,19 +1,24 @@
 import { cleanJSON, cleanCode } from "@/lib/cleanCode";
 import { callLLM } from "@/lib/llm";
-import { buildStructuringPrompt, buildScenePrompt, buildManimPrompt } from "@/lib/promptBuilder";
+import {
+  buildStructuringPrompt,
+  buildScenePrompt,
+  buildManimPrompt,
+} from "@/lib/promptBuilder";
 import { ScenesArraySchema } from "@/lib/schema";
 import { generateSceneCode } from "@/lib/template";
 import fs from "fs";
 import path from "path";
-import {prisma} from "@/lib/prisma"
+import { prisma } from "@/lib/prisma";
 import { execSync } from "child_process";
+import { uploadToS3 } from "./s3";
 
 export async function runPipeline(data: any) {
   const { prompt } = data;
 
   console.log("Running pipeline for:", prompt);
   let log = "";
-  log += "Starting pipeline\n"
+  log += "Starting pipeline\n";
   const structuredPrompt = buildStructuringPrompt(prompt);
   const structRes = await callLLM(structuredPrompt);
   const cleanedStruct = cleanJSON(structRes.content);
@@ -26,7 +31,7 @@ export async function runPipeline(data: any) {
     throw new Error("Structuring JSON failed");
   }
 
-  log += "Structuring completed\n"
+  log += "Structuring completed\n";
   console.log("Structured data:", structuredData);
 
   const scenePrompt = buildScenePrompt(structuredData);
@@ -58,26 +63,26 @@ export async function runPipeline(data: any) {
 
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
-  
+
     console.log(`\n--- Generating Scene ${i + 1} (AI) ---`);
-  
+
     const manimPrompt = buildManimPrompt(scene, i + 1);
     const codeRes = await callLLM(manimPrompt);
     const code = cleanCode(codeRes.content);
-  
+
     console.log(`Scene ${i + 1} code:\n`, code);
-  
+
     const fileName = `scene${i + 1}.py`;
     const filePath = path.join(outputDir, fileName);
-  
+
     fs.writeFileSync(filePath, code);
-  
+
     console.log(`Saved: ${filePath}`);
-  
+
     sceneFiles.push(filePath);
   }
 
-  log += "Scenes genrated\n"
+  log += "Scenes genrated\n";
 
   const videoPaths: string[] = [];
 
@@ -88,8 +93,9 @@ export async function runPipeline(data: any) {
     console.log(`\n--- Rendering ${sceneName} ---`);
 
     try {
-      execSync(`manim ${filePath} ${sceneName} -ql --disable_caching`,
-      { stdio: "inherit" });
+      execSync(`manim ${filePath} ${sceneName} -ql --disable_caching`, {
+        stdio: "inherit",
+      });
 
       const videoPath = `media/videos/${path.basename(
         filePath,
@@ -101,19 +107,18 @@ export async function runPipeline(data: any) {
       videoPaths.push(videoPath);
     } catch (err) {
       console.error(`Scene ${sceneName} failed, skipping...`);
-      continue; 
+      continue;
     }
   }
 
-  log += "Rendering complete\n"
-
+  log += "Rendering complete\n";
 
   const concatFilePath = path.join(process.cwd(), "generated", "concat.txt");
 
   let concatContent = "";
 
-  if(videoPaths.length == 0) {
-    throw new Error("All scenes failed, no video generated")
+  if (videoPaths.length == 0) {
+    throw new Error("All scenes failed, no video generated");
   }
 
   for (const videoPath of videoPaths) {
@@ -127,6 +132,7 @@ export async function runPipeline(data: any) {
   const fileName = `final-${Date.now()}.mp4`;
 
   const finalOutputPath = path.join(process.cwd(), "public/videos", fileName);
+  console.log("Final video created:", finalOutputPath);
 
   try {
     console.log("\n--- Merging videos ---");
@@ -142,7 +148,15 @@ export async function runPipeline(data: any) {
     throw err;
   }
 
-  log += "Video merge\n"
+  log += "Video merge\n";
+
+  console.log("\n--- Uploading to S3 ---");
+
+  const s3FileName = `videos/${fileName}`;
+
+  const s3Url = await uploadToS3(finalOutputPath, s3FileName);
+
+  console.log("Uploaded to S3:", s3Url);
 
   await prisma.videoJob.update({
     where: { id: data.jobId },
@@ -150,7 +164,7 @@ export async function runPipeline(data: any) {
   });
 
   return {
-    videoUrl: `/videos/${fileName}`,
+    videoUrl: s3Url,
     //videoUrl: `/public/final.mp4`,
     structuredData,
     scenes,
