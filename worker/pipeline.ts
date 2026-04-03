@@ -88,7 +88,7 @@ export async function runPipeline(data: any) {
     console.log(`\n--- Rendering ${sceneName} ---`);
 
     try {
-      execSync(`manim ${filePath} ${sceneName} -ql --preview=False --disable_caching`,
+      execSync(`manim ${filePath} ${sceneName} -ql --disable_caching`,
       { stdio: "inherit" });
 
       const videoPath = `media/videos/${path.basename(
