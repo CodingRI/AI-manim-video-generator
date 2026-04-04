@@ -42,7 +42,7 @@ const worker = new Worker(
       const result = await Promise.race<PipelineResult>([
         runPipeline(job.data),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("⏰ Pipeline Timeout (120s)")), 120000)
+          setTimeout(() => reject(new Error("⏰ Pipeline Timeout (240s)")), 240000)
         ),
       ]);
 
