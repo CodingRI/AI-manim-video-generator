@@ -1,16 +1,35 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+
 import {
-  Play, Pause, SkipBack, SkipForward, Maximize2,
-  Crown, ChevronDown, LayoutDashboard, User, LogOut,
-  Sparkles, Cpu, Wand2, Settings2, ChevronLeft, ChevronRight,
-  Video, Clock, Zap, X, Volume2, VolumeX
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Maximize2,
+  Crown,
+  ChevronDown,
+  LayoutDashboard,
+  User,
+  LogOut,
+  Sparkles,
+  Cpu,
+  Wand2,
+  Settings2,
+  ChevronLeft,
+  ChevronRight,
+  Video,
+  Clock,
+  Zap,
+  X,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 
 export default function VideoGeneratorPage() {
-  const [loggedIn, setLoggedIn] = useState(true)
+  const [loggedIn, setLoggedIn] = useState(true);
   const [jobId, setJobId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -20,7 +39,9 @@ export default function VideoGeneratorPage() {
   const [sideOpen, setSideOpen] = useState(true);
   const [duration, setDuration] = useState("30s");
   const [quality, setQuality] = useState("720p");
-  const [openDropdown, setOpenDropdown] = useState<null | "duration" | "quality">(null);
+  const [openDropdown, setOpenDropdown] = useState<
+    null | "duration" | "quality"
+  >(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [videoTime, setVideoTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
@@ -28,6 +49,9 @@ export default function VideoGeneratorPage() {
   const [modelOpen, setModelOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState("DeepSeek Chat");
 
+
+  const searchParams = useSearchParams();
+  const jobIdFromUrl = searchParams.get("jobId");
   const videoRef = useRef<HTMLVideoElement>(null);
   const router = useRouter();
 
@@ -47,98 +71,139 @@ export default function VideoGeneratorPage() {
     };
   }, [videoUrl]);
 
+  useEffect(() => {
+    const storedLogin = localStorage.getItem("loggedIn");
+    if (storedLogin === "true") {
+      setLoggedIn(true);
+    }
+    const savedPrompt = localStorage.getItem("lastPrompt");
+    if (savedPrompt) {
+      setPrompt(savedPrompt);
+    }
+  }, []);
 
-  useEffect(()=> {
-    const storedLogin = localStorage.getItem("loggedIn")
-    if(storedLogin === "true") {
-      setLoggedIn(true)
+  useEffect(() => {
+    if (jobIdFromUrl) {
+      setJobId(jobIdFromUrl);
+      setIsGenerating(true); // assume loading on refresh
     }
-    const savedPrompt = localStorage.getItem("lastPrompt")
-    if(savedPrompt) {
-      setPrompt(savedPrompt)
-    }
-  },[])
+  }, [jobIdFromUrl]);
+
   const handleGenerate = async () => {
     setIsGenerating(true);
     setVideoUrl("");
     setProgress(0);
+    if (jobIdFromUrl) {
+      alert("Video already exists or is processing");
+      return;
+    }
     const res = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, duration, quality }),
     });
+    if (!res.ok) {
+      const err = await res.json();
+      console.error("API Error:", err);
+
+      alert(err.error || "Failed to start video generation");
+
+      setIsGenerating(false);
+      return;
+    }
     const { jobId } = await res.json();
     setJobId(jobId);
-    localStorage.setItem("activeJobId", jobId);
+    router.push(`/videoGeneration?jobId=${jobId}`);
+    //localStorage.setItem("activeJobId", jobId);
     localStorage.setItem("jobStatus", "pending");
-    const interval = setInterval(async () => {
-      const statusRes = await fetch(`/api/job-status?id=${jobId}`);
-      const job = await statusRes.json();
-      setProgress((prev) => Math.min(prev + 10, 90));
-      if (job.status === "completed") {
-        setVideoUrl(job.videoUrl);
-        setProgress(100);
-        setIsGenerating(false);
-        clearInterval(interval);
-      }
-      if (job.status === "completed") {
-        setVideoUrl(job.videoUrl);
-        setProgress(100);
-        setIsGenerating(false);
-        localStorage.removeItem("activeJobId");
-        localStorage.setItem("jobStatus", "done");
-        clearInterval(interval);
-      }
-      if (job.status === "failed") {
-        alert("Sorry, there was an issue generating your video.")
-        setIsGenerating(false);
-        localStorage.removeItem("activeJobId");
-        localStorage.setItem("jobStatus", "failed");
-        clearInterval(interval);
-      }
-      if (job.status === "failed") {
-        setIsGenerating(false);
-        clearInterval(interval);
-      }
-    }, 2000);
   };
 
   useEffect(() => {
-    const savedJob = localStorage.getItem("activeJobId");
-    const savedStatus = localStorage.getItem("jobStatus");
+    const activeJobId = jobIdFromUrl || jobId;
+    if (!activeJobId) return;
   
-    if (savedJob && savedStatus === "pending") {
-      setIsGenerating(true);
-      setProgress(30); 
+    let interval: NodeJS.Timeout;
+    let attempts = 0;
+    const MAX_RETRIES = 10; // optional safety
   
-      const interval = setInterval(async () => {
-        const statusRes = await fetch(`/api/job-status?id=${savedJob}`);
-        const job = await statusRes.json();
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch(`/api/job-status?id=${activeJobId}`);
   
-        setProgress((prev) => Math.min(prev + 5, 90));
+        // ❗ DON'T stop on failure — just retry
+        if (!res.ok) {
+          console.warn("Status not ready yet...");
+          attempts++;
+  
+          if (attempts > MAX_RETRIES) {
+            console.error("Max retries reached");
+            clearInterval(interval);
+          }
+          return;
+        }
+  
+        const data = await res.json();
+        const job = data.job;
+  
+        // ❗ if job not ready yet → retry
+        if (!job || !job.status) {
+          console.warn("Job not ready yet...");
+          return;
+        }
+  
+        // ✅ reset attempts once we get valid response
+        attempts = 0;
+  
+        if (job.prompt) setPrompt(job.prompt);
+        if (job.videoUrl) setVideoUrl(job.videoUrl);
+  
+        if (job.status === "pending") {
+          setProgress(20)
+          setIsGenerating(true);
+        };
+        if (job.status === "processing") {
+          setProgress(60)
+          setIsGenerating(true)
+          };
   
         if (job.status === "completed") {
-          setVideoUrl(job.videoUrl);
           setProgress(100);
           setIsGenerating(false);
-          localStorage.removeItem("activeJobId");
-          localStorage.setItem("jobStatus", "done");
+          setVideoUrl(job.videoUrl || "");
           clearInterval(interval);
+          return;
         }
   
         if (job.status === "failed") {
           setIsGenerating(false);
-          localStorage.removeItem("activeJobId");
-          localStorage.setItem("jobStatus", "failed");
           clearInterval(interval);
+          return;
         }
-      }, 2000);
-    }
-  }, []);
+  
+      } catch (err) {
+        console.warn("Polling retry...");
+      }
+    };
+  
+    // small delay before first poll (important)
+    const timeout = setTimeout(() => {
+      fetchStatus();
+      interval = setInterval(fetchStatus, 5000);
+    }, 1000); // 🔥 gives DB time to settle
+  
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
+  }, [jobId]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
-    if (isPlaying) { videoRef.current.pause(); } else { videoRef.current.play(); }
+    if (isPlaying) {
+      videoRef.current.pause();
+    } else {
+      videoRef.current.play();
+    }
     setIsPlaying(!isPlaying);
   };
 
@@ -157,33 +222,48 @@ export default function VideoGeneratorPage() {
 
   const fmt = (s: number) => {
     if (!s || isNaN(s)) return "0:00";
-    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    const m = Math.floor(s / 60),
+      sec = Math.floor(s % 60);
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
- 
+
   const models = ["DeepSeek Chat", "DeepSeek Coder", "GPT-4o", "Claude Sonnet"];
 
   return (
-    <div className="min-h-screen bg-[#050508] text-white flex overflow-hidden" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-
+    <div
+      className="min-h-screen bg-[#050508] text-white flex overflow-hidden"
+      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+    >
       {/* ── SIDE PANEL ── */}
-      <div className={`relative flex-shrink-0 transition-all duration-300 ease-in-out ${sideOpen ? "w-56" : "w-0"} overflow-hidden`}>
+      <div
+        className={`relative flex-shrink-0 transition-all duration-300 ease-in-out ${
+          sideOpen ? "w-56" : "w-0"
+        } overflow-hidden`}
+      >
         <div className="w-56 h-full bg-[#0c0c10] border-r border-neutral-800/60 flex flex-col py-6 px-4">
-
           {/* Logo */}
           <div className="flex items-center gap-2.5 mb-10 px-1">
             <div className="w-7 h-7 rounded-lg bg-[#7F77DD] flex items-center justify-center flex-shrink-0">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 1L13 4.5V9.5L7 13L1 9.5V4.5L7 1Z" stroke="white" strokeWidth="1.2" fill="none"/>
-                <circle cx="7" cy="7" r="1.5" fill="white"/>
+                <path
+                  d="M7 1L13 4.5V9.5L7 13L1 9.5V4.5L7 1Z"
+                  stroke="white"
+                  strokeWidth="1.2"
+                  fill="none"
+                />
+                <circle cx="7" cy="7" r="1.5" fill="white" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-neutral-200 tracking-tight">Manim Studio</span>
+            <span className="text-sm font-medium text-neutral-200 tracking-tight">
+              Manim Studio
+            </span>
           </div>
 
           {/* Nav */}
           <nav className="flex flex-col gap-1 flex-1">
-            <p className="text-[9px] uppercase tracking-widest text-neutral-600 px-2 mb-2">workspace</p>
+            <p className="text-[9px] uppercase tracking-widest text-neutral-600 px-2 mb-2">
+              workspace
+            </p>
 
             <button
               onClick={() => {}}
@@ -210,7 +290,9 @@ export default function VideoGeneratorPage() {
             </button>
 
             <div className="my-3 border-t border-neutral-800/60" />
-            <p className="text-[9px] uppercase tracking-widest text-neutral-600 px-2 mb-2">settings</p>
+            <p className="text-[9px] uppercase tracking-widest text-neutral-600 px-2 mb-2">
+              settings
+            </p>
 
             <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50 text-xs transition-colors">
               <Settings2 size={13} />
@@ -222,7 +304,8 @@ export default function VideoGeneratorPage() {
           <div className="mt-auto">
             <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-3 mb-4">
               <div className="flex justify-between text-[10px] text-neutral-500 mb-2">
-                <span>Credits</span><span className="text-neutral-300">320 / 1000</span>
+                <span>Credits</span>
+                <span className="text-neutral-300">320 / 1000</span>
               </div>
               <div className="h-1 bg-neutral-800 rounded-full overflow-hidden">
                 <div className="h-full w-[32%] bg-[#7F77DD] rounded-full" />
@@ -230,7 +313,10 @@ export default function VideoGeneratorPage() {
             </div>
 
             <button
-              onClick={() => { localStorage.removeItem("loggedIn"); router.push("/welcomePage"); }}
+              onClick={() => {
+                localStorage.removeItem("loggedIn");
+                router.push("/welcomePage");
+              }}
               className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-red-500/70 hover:text-red-400 hover:bg-red-500/5 text-xs transition-colors"
             >
               <LogOut size={13} />
@@ -251,11 +337,14 @@ export default function VideoGeneratorPage() {
 
       {/* ── MAIN AREA ── */}
       <div className="flex-1 flex flex-col px-8 py-8 min-w-0 overflow-y-auto">
-
         {/* Header */}
         <div className="mb-7">
-          <h1 className="text-lg font-medium text-neutral-100 tracking-tight mb-1">Create your video</h1>
-          <p className="text-xs text-neutral-600">Describe a math concept and watch it come to life</p>
+          <h1 className="text-lg font-medium text-neutral-100 tracking-tight mb-1">
+            Create your video
+          </h1>
+          <p className="text-xs text-neutral-600">
+            Describe a math concept and watch it come to life
+          </p>
         </div>
 
         {/* ── VIDEO PLAYER ── */}
@@ -266,18 +355,20 @@ export default function VideoGeneratorPage() {
           )}
 
           <div className="bg-[#0c0c10] border border-neutral-800 rounded-2xl overflow-hidden">
-
             {/* screen */}
             <div className="relative h-72 bg-[#050508] flex items-center justify-center">
-
               {isGenerating && (
                 <div className="flex flex-col items-center gap-4 w-full max-w-xs">
                   <div className="flex gap-1.5">
-                    {[0,1,2,3,4].map(i => (
+                    {[0, 1, 2, 3, 4].map((i) => (
                       <div
                         key={i}
                         className="w-1 bg-[#7F77DD] rounded-full animate-pulse"
-                        style={{ height: `${16 + Math.sin(i)*8}px`, animationDelay: `${i*0.12}s`, animationDuration: "1s" }}
+                        style={{
+                          height: `${16 + Math.sin(i) * 8}px`,
+                          animationDelay: `${i * 0.12}s`,
+                          animationDuration: "1s",
+                        }}
                       />
                     ))}
                   </div>
@@ -306,7 +397,9 @@ export default function VideoGeneratorPage() {
                   <div className="w-14 h-14 rounded-full border border-neutral-800 flex items-center justify-center text-neutral-700">
                     <Video size={22} />
                   </div>
-                  <p className="text-[10px] text-neutral-700 tracking-widest uppercase">no video yet</p>
+                  <p className="text-[10px] text-neutral-700 tracking-widest uppercase">
+                    no video yet
+                  </p>
                 </div>
               )}
 
@@ -323,7 +416,6 @@ export default function VideoGeneratorPage() {
 
             {/* ── CONTROLS ── */}
             <div className="px-4 py-3 border-t border-neutral-800/60">
-
               {/* scrubber */}
               <div
                 className="w-full h-1 bg-neutral-800 rounded-full mb-3 cursor-pointer relative group"
@@ -331,18 +423,28 @@ export default function VideoGeneratorPage() {
               >
                 <div
                   className="absolute inset-y-0 left-0 bg-[#7F77DD] rounded-full transition-all"
-                  style={{ width: videoDuration ? `${(videoTime/videoDuration)*100}%` : "0%" }}
+                  style={{
+                    width: videoDuration
+                      ? `${(videoTime / videoDuration) * 100}%`
+                      : "0%",
+                  }}
                 />
                 <div
                   className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[#7F77DD] border-2 border-[#050508] opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ left: videoDuration ? `calc(${(videoTime/videoDuration)*100}% - 5px)` : "0" }}
+                  style={{
+                    left: videoDuration
+                      ? `calc(${(videoTime / videoDuration) * 100}% - 5px)`
+                      : "0",
+                  }}
                 />
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => { if(videoRef.current) videoRef.current.currentTime -= 10; }}
+                    onClick={() => {
+                      if (videoRef.current) videoRef.current.currentTime -= 10;
+                    }}
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800 transition-all"
                   >
                     <SkipBack size={13} />
@@ -352,11 +454,17 @@ export default function VideoGeneratorPage() {
                     onClick={togglePlay}
                     className="w-8 h-8 rounded-lg bg-[#7F77DD]/15 border border-[#7F77DD]/25 flex items-center justify-center text-[#9d98e8] hover:bg-[#7F77DD]/25 transition-all"
                   >
-                    {isPlaying ? <Pause size={13} /> : <Play size={13} className="ml-0.5" />}
+                    {isPlaying ? (
+                      <Pause size={13} />
+                    ) : (
+                      <Play size={13} className="ml-0.5" />
+                    )}
                   </button>
 
                   <button
-                    onClick={() => { if(videoRef.current) videoRef.current.currentTime += 10; }}
+                    onClick={() => {
+                      if (videoRef.current) videoRef.current.currentTime += 10;
+                    }}
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800 transition-all"
                   >
                     <SkipForward size={13} />
@@ -375,7 +483,9 @@ export default function VideoGeneratorPage() {
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-neutral-700 border border-neutral-800 rounded px-1.5 py-0.5">{quality}</span>
+                  <span className="text-[10px] text-neutral-700 border border-neutral-800 rounded px-1.5 py-0.5">
+                    {quality}
+                  </span>
                 </div>
               </div>
             </div>
@@ -384,11 +494,10 @@ export default function VideoGeneratorPage() {
 
         {/* ── PROMPT BOX ── */}
         <div className="bg-[#0c0c10] border border-neutral-800 rounded-2xl p-4 mb-4">
-
           <textarea
             value={prompt}
             onChange={(e) => {
-              setPrompt(e.target.value)
+              setPrompt(e.target.value);
               localStorage.setItem("lastPrompt", e.target.value);
             }}
             placeholder="Explain derivatives with a graph animation..."
@@ -397,14 +506,16 @@ export default function VideoGeneratorPage() {
           />
 
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-800/60">
-
             {/* Left controls */}
             <div className="flex items-center gap-2">
-
               {/* Duration */}
               <div className="relative">
                 <button
-                  onClick={() => setOpenDropdown(openDropdown === "duration" ? null : "duration")}
+                  onClick={() =>
+                    setOpenDropdown(
+                      openDropdown === "duration" ? null : "duration"
+                    )
+                  }
                   className="flex items-center gap-1.5 px-2.5 py-1.5 bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-lg text-[11px] text-neutral-400 hover:text-neutral-200 transition-all"
                 >
                   <Clock size={11} />
@@ -413,14 +524,19 @@ export default function VideoGeneratorPage() {
                 </button>
                 {openDropdown === "duration" && (
                   <div className="absolute bottom-full mb-2 left-0 w-28 bg-[#0c0c10] border border-neutral-800 rounded-xl p-1.5 z-20">
-                    {["30s","1m","5m","10m"].map((d) => (
+                    {["30s", "1m", "5m", "10m"].map((d) => (
                       <button
                         key={d}
-                        onClick={() => { setDuration(d); setOpenDropdown(null); }}
+                        onClick={() => {
+                          setDuration(d);
+                          setOpenDropdown(null);
+                        }}
                         className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-all"
                       >
                         {d}
-                        {d === "10m" && <Crown size={10} className="text-amber-500" />}
+                        {d === "10m" && (
+                          <Crown size={10} className="text-amber-500" />
+                        )}
                       </button>
                     ))}
                   </div>
@@ -430,7 +546,11 @@ export default function VideoGeneratorPage() {
               {/* Quality */}
               <div className="relative">
                 <button
-                  onClick={() => setOpenDropdown(openDropdown === "quality" ? null : "quality")}
+                  onClick={() =>
+                    setOpenDropdown(
+                      openDropdown === "quality" ? null : "quality"
+                    )
+                  }
                   className="flex items-center gap-1.5 px-2.5 py-1.5 bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-lg text-[11px] text-neutral-400 hover:text-neutral-200 transition-all"
                 >
                   <Zap size={11} />
@@ -439,10 +559,13 @@ export default function VideoGeneratorPage() {
                 </button>
                 {openDropdown === "quality" && (
                   <div className="absolute bottom-full mb-2 left-0 w-24 bg-[#0c0c10] border border-neutral-800 rounded-xl p-1.5 z-20">
-                    {["480p","720p","1080p"].map((q) => (
+                    {["480p", "720p", "1080p"].map((q) => (
                       <button
                         key={q}
-                        onClick={() => { setQuality(q); setOpenDropdown(null); }}
+                        onClick={() => {
+                          setQuality(q);
+                          setOpenDropdown(null);
+                        }}
                         className="w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-all"
                       >
                         {q}
@@ -476,11 +599,16 @@ export default function VideoGeneratorPage() {
                 </button>
                 {modelOpen && (
                   <div className="absolute bottom-full mb-2 left-0 w-44 bg-[#0c0c10] border border-neutral-800 rounded-xl p-1.5 z-20">
-                    <p className="text-[9px] uppercase tracking-widest text-neutral-600 px-2.5 py-1.5">Model</p>
+                    <p className="text-[9px] uppercase tracking-widest text-neutral-600 px-2.5 py-1.5">
+                      Model
+                    </p>
                     {models.map((m) => (
                       <button
                         key={m}
-                        onClick={() => { setSelectedModel(m); setModelOpen(false); }}
+                        onClick={() => {
+                          setSelectedModel(m);
+                          setModelOpen(false);
+                        }}
                         className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] transition-all flex items-center justify-between ${
                           selectedModel === m
                             ? "text-[#9d98e8] bg-[#7F77DD]/10"
@@ -512,7 +640,9 @@ export default function VideoGeneratorPage() {
 
         {/* Suggestions */}
         <div>
-          <p className="text-[10px] uppercase tracking-widest text-neutral-700 mb-2.5">Suggestions</p>
+          <p className="text-[10px] uppercase tracking-widest text-neutral-700 mb-2.5">
+            Suggestions
+          </p>
           <div className="flex flex-wrap gap-2">
             {[
               "Explain sine waves visually",
@@ -530,7 +660,6 @@ export default function VideoGeneratorPage() {
             ))}
           </div>
         </div>
-
       </div>
     </div>
   );

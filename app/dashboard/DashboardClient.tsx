@@ -26,14 +26,33 @@ export default function DashboardClient({
   jobs: Job[];
   stats: Stats;
 }) {
-  const [filter, setFilter] = useState<"all" | "done" | "pending" | "failed">(
-    "all"
-  );
+  const [filter, setFilter] = useState<
+  "all" | "completed" | "pending" | "failed"
+>("all");
+  const [jobsState, setJobsState] = useState<Job[]>(jobs || []);
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<any>(null);
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const res = await fetch("/api/jobs", {
+          cache: "no-store",
+        });
+   
+        const data = await res.json();
+        setJobsState(data.jobs || []);
+      } catch (err) {
+        console.error("Failed to fetch jobs:", err);
+      }
+    };
+    
+    fetchJobs();
+  }, []);
 
   const filtered =
-    filter === "all" ? jobs : jobs.filter((j) => j.status === filter);
+  filter === "all"
+    ? jobsState
+    : jobsState.filter((j) => j.status === filter);
 
   // Build last-10-days usage data from jobs
   const usageData = (() => {
@@ -45,7 +64,7 @@ export default function DashboardClient({
         month: "short",
         day: "numeric",
       });
-      const dayJobs = jobs.filter((j) => {
+      const dayJobs = jobsState.filter((j) => {
         const jd = new Date(j.createdAt);
         return (
           jd.getDate() === d.getDate() &&
@@ -56,7 +75,7 @@ export default function DashboardClient({
       days.push({
         label,
         credits: dayJobs.length * 50,
-        videos: dayJobs.filter((j) => j.status === "done").length,
+        videos: dayJobs.filter((j) => j.status === "completed").length,
       });
     }
     return days;
@@ -65,13 +84,15 @@ export default function DashboardClient({
   useEffect(() => {
     if (!chartRef.current) return;
     if (typeof window === "undefined") return;
-
-    const script = document.createElement("script");
-    script.src =
-      "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
-    script.onload = () => {
+  
+    const renderChart = () => {
       const Chart = (window as any).Chart;
-      if (chartInstance.current) chartInstance.current.destroy();
+      if (!Chart) return;
+  
+      if (chartInstance.current) {
+        chartInstance.current.destroy();
+      }
+  
       chartInstance.current = new Chart(chartRef.current, {
         type: "line",
         data: {
@@ -138,11 +159,23 @@ export default function DashboardClient({
         },
       });
     };
-    document.head.appendChild(script);
+  
+    if (!(window as any).Chart) {
+      const script = document.createElement("script");
+      script.src =
+        "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+      script.onload = renderChart;
+      document.head.appendChild(script);
+    } else {
+      renderChart();
+    }
+  
     return () => {
-      if (chartInstance.current) chartInstance.current.destroy();
+      if (chartInstance.current) {
+        chartInstance.current.destroy();
+      }
     };
-  }, []);
+  }, [usageData]);
 
   const creditsUsed = stats.done * 50;
   const creditsTotal = 1000;
@@ -275,7 +308,7 @@ export default function DashboardClient({
           Your videos
         </p>
         <div className="flex gap-2">
-          {(["all", "done", "pending", "failed"] as const).map((f) => (
+          {(["all", "completed", "pending", "failed"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -304,7 +337,7 @@ export default function DashboardClient({
           >
             {/* Thumb */}
             <div className="w-11 h-8 rounded bg-neutral-800 flex items-center justify-center flex-shrink-0">
-              {job.status === "done" && (
+              {job.status === "completed" && (
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                   <polygon points="1,0 10,5 1,10" fill="#7F77DD" />
                 </svg>
