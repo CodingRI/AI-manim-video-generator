@@ -20,6 +20,7 @@ const worker = new Worker(
       console.error("❌ Missing jobId in job.data");
       throw new Error("INVALID_JOB_ID");
     }
+    
 
     try {
       // 🔄 STEP 1: Set status → processing
@@ -87,7 +88,15 @@ const worker = new Worker(
       }
     }
   },
-  { connection }
+  {  
+    connection,
+    stalledInterval: 600000, // Check for stalled jobs every 5 minutes (default is 30s)
+    maxStalledCount: 1,      // Don't keep retrying stalled checks
+    
+    // 💤 DRAIN SETTINGS
+    // These reduce how often the worker "pings" Redis when empty
+    drainDelay: 60,          // Wait 60 seconds before polling again if queue is empty
+   }
 );
 
 console.log("👷 Worker started and listening to queue...");
