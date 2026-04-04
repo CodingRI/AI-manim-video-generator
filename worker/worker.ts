@@ -90,7 +90,6 @@ const worker = new Worker(
   },
   {  
     connection,
-    stalledInterval: 600000, // Check for stalled jobs every 5 minutes (default is 30s)
     maxStalledCount: 1,      // Don't keep retrying stalled checks
     
     // 💤 DRAIN SETTINGS

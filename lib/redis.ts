@@ -17,12 +17,7 @@ const isProd = process.env.NODE_ENV === "production";
 
 
     export const connection = 
-        new IORedis({
-        host: process.env.UPSTASH_REDIS_HOST,
-        port: Number(process.env.UPSTASH_REDIS_PORT),
-        password: process.env.UPSTASH_REDIS_PASSWORD,
-        tls: {},
-  
+        new IORedis(process.env.REDIS_URL!,{
         maxRetriesPerRequest: null,
       })
    
