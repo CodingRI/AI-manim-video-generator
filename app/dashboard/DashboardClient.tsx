@@ -49,10 +49,24 @@ export default function DashboardClient({
     fetchJobs();
   }, []);
 
+  
+
   const filtered =
   filter === "all"
     ? jobsState
     : jobsState.filter((j) => j.status === filter);
+
+  const computedStats = {
+      total: jobsState.length,
+      done: jobsState.filter((j) => j.status === "completed").length,
+      pending: jobsState.filter((j) => j.status === "pending").length,
+      failed: jobsState.filter((j) => j.status === "failed").length,
+    };
+    
+  const successRate =
+      computedStats.total > 0
+        ? Math.round((computedStats.done / computedStats.total) * 100)
+        : 0;
 
   // Build last-10-days usage data from jobs
   const usageData = (() => {
@@ -177,7 +191,7 @@ export default function DashboardClient({
     };
   }, [usageData]);
 
-  const creditsUsed = stats.done * 50;
+  const creditsUsed = computedStats.done * 50;
   const creditsTotal = 1000;
   const creditsPct = Math.min(
     100,
@@ -199,18 +213,18 @@ export default function DashboardClient({
         {[
           {
             label: "Total videos",
-            value: stats.total,
-            sub: `${stats.done} completed`,
+            value: computedStats.total,
+            sub: `${computedStats.done} completed`,
           },
           {
             label: "Credits used",
             value: creditsUsed,
             sub: `of ${creditsTotal}`,
           },
-          { label: "Pending", value: stats.pending, sub: "in queue" },
+          { label: "Pending", value: computedStats.pending, sub: "in queue" },
           {
             label: "Success rate",
-            value: `${stats.successRate}%`,
+            value: `${successRate}%`,
             sub: "scenes rendered",
           },
         ].map((m) => (
@@ -276,12 +290,12 @@ export default function DashboardClient({
             <div>
               <div className="flex justify-between text-xs text-neutral-400 mb-2">
                 <span>Completed scenes</span>
-                <span>{stats.done * 4} est.</span>
+                <span>{computedStats.done * 4} est.</span>
               </div>
               <div className="h-1 bg-neutral-800 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full bg-[#1D9E75]"
-                  style={{ width: `${Math.min(100, stats.done * 7)}%` }}
+                  style={{ width: `${Math.min(100, computedStats.done * 7)}%` }}
                 />
               </div>
             </div>
@@ -290,8 +304,8 @@ export default function DashboardClient({
           <div className="flex justify-between pt-4 border-t border-neutral-800 mt-4">
             {[
               { val: creditsTotal - creditsUsed, lbl: "remaining" },
-              { val: stats.total, lbl: "videos" },
-              { val: stats.failed, lbl: "failed" },
+              { val: computedStats.total, lbl: "videos" },
+              { val: computedStats.failed, lbl: "failed" },
             ].map((s) => (
               <div key={s.lbl} className="text-center">
                 <p className="text-base font-medium text-white">{s.val}</p>
