@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);

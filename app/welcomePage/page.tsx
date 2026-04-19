@@ -508,12 +508,6 @@ export default function WelcomePage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => router.push("/auth")}
-            className="px-4 py-2 text-xs text-neutral-500 hover:text-neutral-200 transition-colors"
-          >
-            Sign in
-          </button>
-          <button
-            onClick={() => router.push("/auth")}
             className="flex items-center gap-2 px-4 py-2 bg-[#7F77DD] hover:bg-[#6e66cc] text-white text-xs rounded-lg transition-all active:scale-95"
           >
             <Sparkles size={11} />

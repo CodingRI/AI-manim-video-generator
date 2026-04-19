@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import VideoSkeleton from "@/components/ui/VideoSkeleton";
 
 import {
   Play,
@@ -43,6 +44,7 @@ export default function VideoGeneratorPage() {
     null | "duration" | "quality"
   >(null);
   const [videoUrl, setVideoUrl] = useState("");
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [videoTime, setVideoTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [enhanceActive, setEnhanceActive] = useState(false);
@@ -54,6 +56,7 @@ export default function VideoGeneratorPage() {
   const jobIdFromUrl = searchParams.get("jobId");
   const videoRef = useRef<HTMLVideoElement>(null);
   const router = useRouter();
+
 
   useEffect(() => {
     const v = videoRef.current;
@@ -87,7 +90,12 @@ export default function VideoGeneratorPage() {
       setJobId(jobIdFromUrl);
       setIsGenerating(true); // assume loading on refresh
     }
-  }, [jobIdFromUrl]);
+    if (!jobIdFromUrl && !jobId) {
+      setIsInitialLoading(false);
+    }
+  }, [jobIdFromUrl, jobId]);
+
+ 
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -150,6 +158,8 @@ export default function VideoGeneratorPage() {
           console.warn("Job not ready yet...");
           return;
         }
+
+        setIsInitialLoading(false);
   
         // ✅ reset attempts once we get valid response
         attempts = 0;
@@ -183,7 +193,7 @@ export default function VideoGeneratorPage() {
       } catch (err) {
         console.warn("Polling retry...");
       }
-    };
+    }
   
     // small delay before first poll (important)
     const timeout = setTimeout(() => {
@@ -196,6 +206,7 @@ export default function VideoGeneratorPage() {
       if (interval) clearInterval(interval);
     };
   }, [jobId]);
+
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -229,112 +240,16 @@ export default function VideoGeneratorPage() {
 
   const models = ["DeepSeek Chat", "DeepSeek Coder", "GPT-4o", "Claude Sonnet"];
 
+  if (isInitialLoading ) {
+    return <VideoSkeleton />;
+  }
+
   return (
     <div
       className="min-h-screen bg-[#050508] text-white flex overflow-hidden"
       style={{ fontFamily: "'JetBrains Mono', monospace" }}
     >
-      {/* ── SIDE PANEL ── */}
-      <div
-        className={`relative flex-shrink-0 transition-all duration-300 ease-in-out ${
-          sideOpen ? "w-56" : "w-0"
-        } overflow-hidden`}
-      >
-        <div className="w-56 h-full bg-[#0c0c10] border-r border-neutral-800/60 flex flex-col py-6 px-4">
-          {/* Logo */}
-          <div className="flex items-center gap-2.5 mb-10 px-1">
-            <div className="w-7 h-7 rounded-lg bg-[#7F77DD] flex items-center justify-center flex-shrink-0">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path
-                  d="M7 1L13 4.5V9.5L7 13L1 9.5V4.5L7 1Z"
-                  stroke="white"
-                  strokeWidth="1.2"
-                  fill="none"
-                />
-                <circle cx="7" cy="7" r="1.5" fill="white" />
-              </svg>
-            </div>
-            <span className="text-sm font-medium text-neutral-200 tracking-tight">
-              Manim Studio
-            </span>
-          </div>
-
-          {/* Nav */}
-          <nav className="flex flex-col gap-1 flex-1">
-            <p className="text-[9px] uppercase tracking-widest text-neutral-600 px-2 mb-2">
-              workspace
-            </p>
-
-            <button
-              onClick={() => {}}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[#7F77DD]/10 border border-[#7F77DD]/20 text-[#9d98e8] text-xs"
-            >
-              <Video size={13} />
-              Generate
-            </button>
-
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50 text-xs transition-colors"
-            >
-              <LayoutDashboard size={13} />
-              Dashboard
-            </button>
-
-            <button
-              onClick={() => router.push("/profile")}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50 text-xs transition-colors"
-            >
-              <User size={13} />
-              Profile
-            </button>
-
-            <div className="my-3 border-t border-neutral-800/60" />
-            <p className="text-[9px] uppercase tracking-widest text-neutral-600 px-2 mb-2">
-              settings
-            </p>
-
-            <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50 text-xs transition-colors">
-              <Settings2 size={13} />
-              Preferences
-            </button>
-          </nav>
-
-          {/* Credits */}
-          <div className="mt-auto">
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-3 mb-4">
-              <div className="flex justify-between text-[10px] text-neutral-500 mb-2">
-                <span>Credits</span>
-                <span className="text-neutral-300">320 / 1000</span>
-              </div>
-              <div className="h-1 bg-neutral-800 rounded-full overflow-hidden">
-                <div className="h-full w-[32%] bg-[#7F77DD] rounded-full" />
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                localStorage.removeItem("loggedIn");
-                router.push("/welcomePage");
-              }}
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-red-500/70 hover:text-red-400 hover:bg-red-500/5 text-xs transition-colors"
-            >
-              <LogOut size={13} />
-              Sign out
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── TOGGLE SIDE PANEL ── */}
-      <button
-        onClick={() => setSideOpen(!sideOpen)}
-        className="absolute top-1/2 -translate-y-1/2 z-30 w-5 h-10 bg-neutral-800 border border-neutral-700 rounded-r-lg flex items-center justify-center text-neutral-500 hover:text-neutral-300 hover:bg-neutral-700 transition-all"
-        style={{ left: sideOpen ? "224px" : "0px" }}
-      >
-        {sideOpen ? <ChevronLeft size={11} /> : <ChevronRight size={11} />}
-      </button>
-
+  
       {/* ── MAIN AREA ── */}
       <div className="flex-1 flex flex-col px-8 py-8 min-w-0 overflow-y-auto">
         {/* Header */}

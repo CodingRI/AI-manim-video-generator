@@ -63,7 +63,7 @@ export default function ProfilePage() {
       style={{ fontFamily: "'JetBrains Mono', monospace" }}
     >
       {/* ── SIDE NAV ── */}
-      <div className="w-56 flex-shrink-0 bg-[#0c0c10] border-r border-neutral-800/60 flex flex-col py-6 px-4">
+      {/* <div className="w-56 flex-shrink-0 bg-[#0c0c10] border-r border-neutral-800/60 flex flex-col py-6 px-4">
         <div className="flex items-center gap-2.5 mb-10 px-1">
           <div className="w-7 h-7 rounded-lg bg-[#7F77DD] flex items-center justify-center flex-shrink-0">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -111,7 +111,7 @@ export default function ProfilePage() {
             <LogOut size={13} />Sign out
           </button>
         </div>
-      </div>
+      </div> */}
 
       {/* ── MAIN ── */}
       <div className="flex-1 overflow-y-auto px-8 py-8 min-w-0">
