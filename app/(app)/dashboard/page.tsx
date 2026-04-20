@@ -5,9 +5,17 @@ import { authOptions } from "@/lib/auth";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
+  type Job = {
+  id: string;
+  prompt: string;
+  status: "completed" | "pending" | "failed";
+  videoUrl: string | null;
+  createdAt: Date;
+};
+
   const jobs = await prisma.videoJob.findMany({
     where: {
-      userId: session?.user?.email || "anonymous",
+      userId: session?.user?.email ?? "",
     },
     orderBy: { createdAt: "desc" },
   });
