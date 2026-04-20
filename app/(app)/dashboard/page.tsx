@@ -13,9 +13,9 @@ export default async function DashboardPage() {
   });
 
   const total = jobs.length;
-  const done = jobs.filter((j) => j.status === "completed").length;
-  const pending = jobs.filter((j) => j.status === "pending").length;
-  const failed = jobs.filter((j) => j.status === "failed").length;
+  const done = jobs.filter((j : any ) => j.status === "completed").length;
+  const pending = jobs.filter((j : any) => j.status === "pending").length;
+  const failed = jobs.filter((j : any) => j.status === "failed").length;
   const successRate =
     total > 0 ? Math.round((done / total) * 100) : 0;
 
