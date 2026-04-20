@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import { connection } from "../lib/redis";
+import { createRedisConnection } from "../lib/redis";
 import { runPipeline } from "./pipeline";
 import { prisma } from "../lib/prisma";
 
@@ -75,7 +75,7 @@ const worker = new Worker(
     } catch (err) {
       console.error("🔥 Job failed:", jobId, err);
 
-      // ❌ STEP 4: Set status → failed (safe)
+      // STEP 4: Set status → failed (safe)
       try {
         await prisma.videoJob.update({
           where: { id: jobId },
@@ -89,12 +89,10 @@ const worker = new Worker(
     }
   },
   {  
-    connection,
-    maxStalledCount: 1,      // Don't keep retrying stalled checks
-    
-    // 💤 DRAIN SETTINGS
-    // These reduce how often the worker "pings" Redis when empty
-    drainDelay: 60,          // Wait 60 seconds before polling again if queue is empty
+    connection: createRedisConnection(),
+    concurrency: 2,
+    maxStalledCount: 1,
+    drainDelay: 60, 
    }
 );
 
