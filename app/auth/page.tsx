@@ -14,18 +14,29 @@ export default function AuthPage() {
   const router = useRouter();
 
   const handleSignup = async () => {
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
-    });
-    if (res.ok) {
-      localStorage.setItem("loggedIn", "true");
-      await signIn("credentials", {
-        email,
-        password,
-        callbackUrl: "/videoGeneration",
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
       });
+  
+      const data = await res.json();
+  
+      if (!res.ok) {
+        alert(data.error || "Something went wrong");
+        return;
+      }
+  
+
+      router.push(
+        `/auth/verify?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&password=${encodeURIComponent(password)}`
+      );
+    } catch (err) {
+      console.error("Signup error:", err);
+      alert("Failed to send OTP");
     }
   };
   const handleLogin = async () => {
