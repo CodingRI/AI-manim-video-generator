@@ -7,6 +7,8 @@ import {
   ChevronLeft, ChevronRight, Zap, LogOut
 } from "lucide-react";
 
+import { signOut } from "next-auth/react";
+
 export default function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -102,7 +104,7 @@ export default function Sidebar() {
           <div className="mt-auto flex-shrink-0">
             
             <button
-              onClick={() => router.push("/auth")}
+              onClick={async () => await signOut({ callbackUrl: "/auth" })}
               className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-red-500/70 hover:text-red-400 hover:bg-red-500/5 text-xs transition-colors whitespace-nowrap"
             >
               <LogOut size={13} className="flex-shrink-0" />

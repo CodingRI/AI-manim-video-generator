@@ -20,7 +20,9 @@ export default function AuthPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email,
+          name,
+          password,}),
       });
   
       const data = await res.json();
@@ -28,11 +30,10 @@ export default function AuthPage() {
       if (!res.ok) {
         alert(data.error || "Something went wrong");
         return;
-      }
-  
+      } 
 
       router.push(
-        `/auth/verify?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&password=${encodeURIComponent(password)}`
+        `/auth/verify?email=${encodeURIComponent(email)}`
       );
     } catch (err) {
       console.error("Signup error:", err);

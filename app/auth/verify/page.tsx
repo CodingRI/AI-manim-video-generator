@@ -10,8 +10,6 @@ export default function VerifyPage() {
   const router = useRouter();
 
   const email = params.get("email")!;
-  const name = params.get("name")!;
-  const password = params.get("password")!;
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [timer, setTimer] = useState(60);
@@ -59,11 +57,21 @@ export default function VerifyPage() {
     setError("");
     const res = await fetch("/api/auth/verify-otp", {
       method: "POST",
-      body: JSON.stringify({ email, name, password, otp: code }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, otp: code }),
     });
+    
+    const data = await res.json();
+    
     if (res.ok) {
-      await signIn("credentials", { email, password, callbackUrl: "/videoGeneration" });
-    } else {
+      await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        callbackUrl: "/videoGeneration",
+      });
+    }else {
       setError("Invalid code. Please try again.");
       setLoading(false);
     }
@@ -184,7 +192,7 @@ export default function VerifyPage() {
 
         {/* Back to sign in */}
         <button
-          onClick={() => router.push("/auth")}
+          onClick={() => router.replace("/auth")}
           className="flex items-center gap-2 mt-5 mx-auto text-[11px] text-neutral-600 hover:text-neutral-400 transition-colors"
         >
           <ArrowLeft size={11} />

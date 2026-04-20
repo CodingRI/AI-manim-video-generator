@@ -3,6 +3,15 @@ import IORedis from "ioredis";
 const redis = new IORedis(process.env.REDIS_URL!, {
   maxRetriesPerRequest: null,
 });
+export async function canSendOTP(email: string) {
+    const key = `otp_cooldown:${email}`;
+    const exists = await redis.get(key);
+  
+    if (exists) return false;
+  
+    await redis.set(key, "1", "EX", 60); 
+    return true;
+  }
 
 export async function setOTP(email: string, otp: string) {
 
@@ -23,4 +32,17 @@ export async function incrementAttempts(email: string) {
 export async function deleteOTP(email: string) {
   await redis.del(`otp:${email}`);
   await redis.del(`otp_attempts:${email}`);
+}
+
+export async function setSignupData(email: string, data: any) {
+  await redis.set(`signup:${email}`, JSON.stringify(data), "EX", 300); // 5 min expiry
+}
+
+export async function getSignupData(email: string) {
+  const data = await redis.get(`signup:${email}`);
+  return data ? JSON.parse(data) : null;
+}
+
+export async function deleteSignupData(email: string) {
+  await redis.del(`signup:${email}`);
 }

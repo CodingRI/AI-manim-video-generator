@@ -1,21 +1,29 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { getOTP, incrementAttempts, deleteOTP } from "@/lib/otpHandler/otp";
+import { getOTP, incrementAttempts, deleteOTP, getSignupData, deleteSignupData  } from "@/lib/otpHandler/otp";
+
 
 export async function POST(req: Request) {
-  const { email, password, name, otp } = await req.json();
+  const { email, otp } = await req.json();
+  const cleanEmail = email.trim().toLowerCase().replace(/[^\w@.\-+]/g, "");
+  const signupData = await getSignupData(cleanEmail);
 
-  const storedOTP = await getOTP(email);
+if (!signupData) {
+  return NextResponse.json({ error: "Signup expired" }, { status: 400 });
+}
+
+const { name, password } = signupData;
+  const storedOTP = await getOTP(cleanEmail);
 
   if (!storedOTP) {
     return NextResponse.json({ error: "OTP expired" }, { status: 400 });
   }
 
   // check attempts
-  const attempts = await incrementAttempts(email);
+  const attempts = await incrementAttempts(cleanEmail);
   if (attempts > 5) {
-    await deleteOTP(email);
+    await deleteOTP(cleanEmail);
     return NextResponse.json({ error: "Too many attempts" }, { status: 400 });
   }
 
@@ -35,5 +43,12 @@ export async function POST(req: Request) {
     },
   });
 
-  return NextResponse.json({ success: true });
+
+  await deleteSignupData(cleanEmail);
+
+  return NextResponse.json({ success: true,
+  email: cleanEmail,
+  password: signupData.password, });
+
+
 }

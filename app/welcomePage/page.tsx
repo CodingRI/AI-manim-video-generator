@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Github, Menu, Play, Sparkles, X } from "lucide-react";
+import { ArrowRight, Github, Menu, Play, Sparkles, X, Pause } from "lucide-react";
 import * as THREE from "three";
 
 export default function WelcomePage() {
@@ -10,6 +10,8 @@ export default function WelcomePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const aboutRef = useRef<HTMLElement>(null);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+const [playingIdx, setPlayingIdx] = useState<number | null>(null);
   const [cardTilts, setCardTilts] = useState([
     { rx: 0, ry: 0 },
     { rx: 0, ry: 0 },
@@ -1093,19 +1095,22 @@ export default function WelcomePage() {
 
   const aboutCards = [
     {
-      step: "Step 01",
-      title: "Describe",
-      desc: "Type a natural language prompt describing the math concept you want to visualize.",
+      step: "Example 01",
+      title: "Prompt",
+      desc: "Intro to matrix multiplication.",
+      video: "https://manim-video-generator.s3.eu-north-1.amazonaws.com/videos/matrix-multiplication.mp4"
     },
     {
-      step: "Step 02",
-      title: "Generate",
-      desc: "AI plans scenes, generates Manim code, and renders each animation segment automatically.",
+      step: "Example 02",
+      title: "Prompt",
+      desc: "Basics of neural networks.",
+      video: "https://manim-video-generator.s3.eu-north-1.amazonaws.com/videos/nural-networks.mp4"
     },
     {
-      step: "Step 03",
-      title: "Export",
-      desc: "Get a polished MP4 video ready to share, embed, or present anywhere.",
+      step: "Example 03",
+      title: "Prompt",
+      desc: "Space-time curvature.",
+      video: "https://manim-video-generator.s3.eu-north-1.amazonaws.com/videos/space-time.mp4"
     },
   ];
 
@@ -1183,7 +1188,7 @@ export default function WelcomePage() {
               onClick={scrollToAbout}
               className="px-4 py-2 text-xs text-neutral-500 hover:text-neutral-200 rounded-lg hover:bg-neutral-800/50 transition-colors"
             >
-              About
+              View examples
             </button>
             {["Pricing", "Docs"].map((item) => (
               <button
@@ -1312,12 +1317,7 @@ export default function WelcomePage() {
             Start creating
             <ArrowRight size={13} />
           </button>
-          <button
-            onClick={() => router.push("/auth")}
-            className="px-6 py-3 bg-transparent border border-neutral-800 hover:border-neutral-700 text-neutral-500 hover:text-neutral-300 text-xs rounded-xl transition-all"
-          >
-            View examples
-          </button>
+          
         </div>
 
         <div className="flex items-center gap-10 mt-16">
@@ -1353,19 +1353,19 @@ export default function WelcomePage() {
       >
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-20">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#7F77DD]/8 border border-[#7F77DD]/15 rounded-full text-[10px] text-[#7F77DD]/70 tracking-widest uppercase mb-6">
-              How it works
-            </div>
-            <h2
+          <h2
               className="text-4xl font-light text-neutral-200 mb-4"
               style={{ fontFamily: "'Crimson Pro', Georgia, serif" }}
             >
-              Three steps to{" "}
+              Shout out to {" "}
               <span className="italic" style={{ color: "#7F77DD" }}>
-                stunning
+                3blue1brown
               </span>{" "}
-              math videos
             </h2>
+            <div className="inline-flex items-center gap-4 px-3 py-1.5 bg-[#7F77DD]/8 border border-[#7F77DD]/15 rounded-full text-[10px] text-[#7F77DD]/70 tracking-widest uppercase mb-6">
+              What you'll make
+            </div>
+            
             <p
               className="text-neutral-600 max-w-md mx-auto leading-relaxed"
               style={{
@@ -1379,70 +1379,73 @@ export default function WelcomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {aboutCards.map((card, i) => (
-              <div
-                key={i}
-                className="group"
-                style={{ perspective: "1000px" }}
-                onMouseMove={(e) => handleCardMove(e, i)}
-                onMouseLeave={() => handleCardLeave(i)}
-              >
-                <div
-                  className="relative rounded-2xl border border-neutral-800/60 bg-[#0a0a12]/90 backdrop-blur-sm overflow-hidden transition-all duration-300 ease-out group-hover:border-[#7F77DD]/20 group-hover:shadow-[0_0_40px_-12px_rgba(127,119,221,0.15)]"
-                  style={{
-                    transform: `rotateX(${cardTilts[i].rx}deg) rotateY(${cardTilts[i].ry}deg) scale(${cardTilts[i].rx !== 0 || cardTilts[i].ry !== 0 ? 1.02 : 1})`,
-                    transformStyle: "preserve-3d",
-                  }}
-                >
-                  <div className="aspect-video relative overflow-hidden bg-gradient-to-br from-[#0f0f1a] via-[#0d0d18] to-[#0a0a12]">
-                    <video
-                      className="w-full h-full object-cover opacity-0 group-hover:opacity-20 transition-opacity duration-700"
-                      autoPlay
-                      muted
-                      loop
-                      playsInline
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-14 h-14 rounded-full border border-[#7F77DD]/15 group-hover:border-[#7F77DD]/35 flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:shadow-[0_0_30px_-5px_rgba(127,119,221,0.2)]">
-                        <Play
-                          size={20}
-                          className="text-[#7F77DD]/30 group-hover:text-[#7F77DD]/65 ml-0.5 transition-colors duration-500"
-                        />
-                      </div>
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a12] via-transparent to-transparent" />
-                  </div>
-
-                  <div
-                    className="p-6"
-                    style={{ transform: "translateZ(20px)" }}
-                  >
-                    <div className="text-[10px] text-[#7F77DD]/60 uppercase tracking-[0.2em] mb-2.5 font-medium">
-                      {card.step}
-                    </div>
-                    <h3
-                      className="text-lg font-medium text-neutral-200 mb-2"
-                      style={{
-                        fontFamily: "'Crimson Pro', Georgia, serif",
-                      }}
-                    >
-                      {card.title}
-                    </h3>
-                    <p className="text-xs text-neutral-600 leading-relaxed">
-                      {card.desc}
-                    </p>
-                  </div>
-
-                  <div
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
-                    style={{
-                      background: `radial-gradient(400px circle at ${cardGlows[i].x}% ${cardGlows[i].y}%, rgba(127,119,221,0.06), transparent 60%)`,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
+  {aboutCards.map((card, i) => {
+    const playing = playingIdx === i;
+    return (
+      <div
+        key={i}
+        className="group"
+        style={{ perspective: "1000px" }}
+        onMouseMove={(e) => handleCardMove(e, i)}
+        onMouseLeave={() => handleCardLeave(i)}
+      >
+        <div
+          className="relative rounded-2xl border border-neutral-800/60 bg-[#0a0a12]/90 backdrop-blur-sm overflow-hidden transition-all duration-300 ease-out group-hover:border-[#7F77DD]/20 group-hover:shadow-[0_0_60px_-8px_rgba(127,119,221,0.25)]"
+          style={{
+            transform: `rotateX(${cardTilts[i].rx}deg) rotateY(${cardTilts[i].ry}deg) scale(${cardTilts[i].rx !== 0 || cardTilts[i].ry !== 0 ? 1.02 : 1})`,
+            transformStyle: "preserve-3d",
+          }}
+        >
+          {/* VIDEO */}
+          <div className="aspect-video relative overflow-hidden bg-black">
+            <video
+              ref={(el) => { videoRefs.current[i] = el; }}
+              src={card.video}
+              className="w-full h-full object-cover"
+              muted
+              loop
+              playsInline
+            />
+            {/* play / pause — bottom-left, never hides video */}
+            <button
+              onClick={() => {
+                const v = videoRefs.current[i];
+                if (!v) return;
+                if (playing) { v.pause(); setPlayingIdx(null); }
+                else { v.play(); setPlayingIdx(i); }
+              }}
+              className="absolute bottom-3 left-3 w-8 h-8 rounded-lg bg-black/50 border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/70 transition-all"
+            >
+              {playing ? <Pause size={13} /> : <Play size={13} className="ml-0.5" />}
+            </button>
           </div>
+
+          {/* TEXT */}
+          <div className="p-5" style={{ transform: "translateZ(20px)" }}>
+            <div className="text-[10px] text-[#7F77DD]/60 uppercase tracking-[0.2em] mb-2 font-medium">
+              {card.step}
+            </div>
+            <h3
+              className="text-lg font-medium text-neutral-200 mb-1.5"
+              style={{ fontFamily: "'Crimson Pro', Georgia, serif" }}
+            >
+              {card.title}
+            </h3>
+            <p className="text-xs text-neutral-600 leading-relaxed">{card.desc}</p>
+          </div>
+
+          {/* hover glow */}
+          <div
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+            style={{
+              background: `radial-gradient(400px circle at ${cardGlows[i].x}% ${cardGlows[i].y}%, rgba(127,119,221,0.08), transparent 60%)`,
+            }}
+          />
+        </div>
+      </div>
+    );
+  })}
+</div>
         </div>
       </section>
     </main>
