@@ -2,18 +2,12 @@ import { prisma } from "@/lib/prisma";
 import DashboardClient from "./DashboardClient";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { VideoJob } from "@prisma/client";
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions)
-  type Job = {
-  id: string;
-  prompt: string;
-  status: "completed" | "pending" | "failed";
-  videoUrl: string | null;
-  createdAt: Date;
-};
+  const session = await getServerSession(authOptions);
 
-  const jobs = await prisma.videoJob.findMany({
+  const jobs: VideoJob[] = await prisma.videoJob.findMany({
     where: {
       userId: session?.user?.email ?? "",
     },
@@ -21,9 +15,10 @@ export default async function DashboardPage() {
   });
 
   const total = jobs.length;
-  const done = jobs.filter((j : any ) => j.status === "completed").length;
-  const pending = jobs.filter((j : any) => j.status === "pending").length;
-  const failed = jobs.filter((j : any) => j.status === "failed").length;
+  const done = jobs.filter((j) => j.status === "completed").length;
+  const pending = jobs.filter((j) => j.status === "pending").length;
+  const failed = jobs.filter((j) => j.status === "failed").length;
+
   const successRate =
     total > 0 ? Math.round((done / total) * 100) : 0;
 
