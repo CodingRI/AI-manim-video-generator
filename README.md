@@ -1,6 +1,6 @@
-# AI Manim Video Generator
+# Manim Studio
 
-Welcome to the **AI Manim Video Generator**. This project is a full-stack, distributed application that automatically transforms natural language prompts into programmatic, high-quality educational animations.
+Welcome to **Manim studio**. A full-stack, distributed application that automatically transforms natural language prompts into programmatic, high-quality educational animations.
 
 By chaining Large Language Models (LLMs) with the Manim mathematical animation engine, this system automates the traditionally labor-intensive process of scripting, animating, and rendering technical concepts into seamless video presentations.
 
