@@ -27,9 +27,10 @@ By chaining Large Language Models (LLMs) with the Manim mathematical animation e
 
 
 
-The platform is designed around a microservices-inspired architecture, decoupling the fast, user-facing Next.js application from the heavy, asynchronous video rendering workloads.
+The platform is designed around a microservices-inspired architecture, decoupling the fast, user-facing Next.js application from the heavy, asynchronous video rendering workloads. Here is the rough architecture of the main workflow ->
 
-*(Insert Architecture Diagram Here)*
+<img width="1217" height="539" alt="Screenshot 2026-05-30 at 9 10 34 PM" src="https://github.com/user-attachments/assets/41270ef8-3f0f-44df-8035-d23c9f830eb8" />
+
 
 
 ### 1. API & Authentication Layer
