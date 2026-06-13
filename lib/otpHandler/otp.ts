@@ -1,8 +1,6 @@
-import IORedis from "ioredis";
+import { createRedisConnection } from "../redis";
 
-const redis = new IORedis(process.env.REDIS_URL!, {
-  maxRetriesPerRequest: null,
-});
+const redis = createRedisConnection();
 export async function canSendOTP(email: string) {
     const key = `otp_cooldown:${email}`;
     const exists = await redis.get(key);
