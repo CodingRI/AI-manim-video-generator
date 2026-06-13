@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "worker": "tsx worker/index.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "env:dev": "node scripts/switch-env.js dev",
+    "env:prod": "node scripts/switch-env.js prod"
   },
   "pnpm": {
     "overrides": {
