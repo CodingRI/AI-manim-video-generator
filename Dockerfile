@@ -42,4 +42,4 @@ RUN pip install --no-cache-dir manim==0.20.0
 
 RUN mkdir -p generated public/videos
 
-CMD ["xvfb-run","-s","-screen 0 1400x900x24","pnpm","worker"]
+CMD xvfb-run -s "-screen 0 1400x900x24" pnpm worker

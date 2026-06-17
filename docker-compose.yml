@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────────
+# docker-compose.yml  —  Backend services (local development)
+#
+# Manages: redis + manim worker
+# Frontend: run separately with `pnpm run dev` as usual
+#
+# Usage:
+#   docker compose up --build        # first run (builds the image)
+#   docker compose up -d             # subsequent runs (detached)
+#   docker compose logs -f worker    # tail worker logs
+#   docker compose down              # stop everything
+#
+# REDIS_URL is overridden per-service so the localhost value in .env
+# doesn't break container networking. Everything else comes from .env.
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Redis ────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"    # exposed to host so pnpm run dev can reach it
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── BullMQ Worker (manim + node inside the image) ────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379   # override .env's localhost value
+    depends_on:
+      redis:
+        condition: service_healthy
+    # Dockerfile CMD: xvfb-run -s "-screen 0 1400x900x24" pnpm worker
+
+volumes:
+  redis_data:

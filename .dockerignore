@@ -1,0 +1,26 @@
+# Dependencies — installed inside image by pnpm install
+node_modules
+
+# Next.js build output
+.next
+out
+
+# Generated files — written at runtime inside the container
+generated
+media
+public/videos
+
+# Git / IDE
+.git
+.gitignore
+.vscode
+.DS_Store
+
+# Env files — supplied via env_file / environment in compose, not baked in
+.env
+.env.*
+
+# Misc
+npm-debug.log*
+*.tsbuildinfo
+README.md
