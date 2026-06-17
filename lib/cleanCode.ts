@@ -1,27 +1,41 @@
+
 export function cleanJSON(input: string): string {
-    return input
+  return input
     .replace(/```json/g, "")
     .replace(/```/g, "")
-    .replace(/\n/g, "")
     .trim();
-  }
+}
 
 export function cleanCode(input: string): string {
-    let code =  input
-      .replace(/```python/g, "")
-      .replace(/```/g, "")
-      .trim();
+  let code = input
+    .replace(/```python/g, "")
+    .replace(/```/g, "")
+    .trim();
 
-      if (code.includes("np.") && !code.includes("import numpy as np")) {
-        code = "import numpy as np\n" + code;
-      }
+  const manimStart = code.indexOf("from manim import");
 
-      code = code.replace(/MathTex\((.*?)\)/g, "Text($1)");
-      code = code.replace(/r"(.*?)"/g, '"$1"');
-
-      if (!code.includes("from manim import")) {
-        code = "from manim import *\n" + code;
-      }
-    
-      return code;
+  if (manimStart !== -1) {
+    code = code.slice(manimStart);
   }
+
+  // Ensure manim import exists
+  if (!code.includes("from manim import")) {
+    code = "from manim import *\n\n" + code;
+  }
+
+  // Ensure numpy import exists if needed
+  if (code.includes("np.") && !code.includes("import numpy as np")) {
+    code =
+      "import numpy as np\n" +
+      code;
+  }
+
+  // Remove markdown artifacts
+  code = code
+    .replace(/^Here'?s.*$/gm, "")
+    .replace(/^The following.*$/gm, "")
+    .replace(/^Python code.*$/gm, "")
+    .trim();
+
+  return code;
+}
