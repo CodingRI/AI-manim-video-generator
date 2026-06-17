@@ -7,11 +7,44 @@ import {
 } from "@/lib/promptBuilder";
 import { ScenesArraySchema } from "@/lib/schema";
 import { generateSceneCode } from "@/lib/template";
+import { validateCode } from "@/lib/validateCode";
 import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
 import { execSync } from "child_process";
 import { uploadToS3 } from "./s3";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Silently delete a file — never throws. */
+function safeUnlink(filePath: string) {
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`[cleanup] Deleted: ${filePath}`);
+    }
+  } catch (err) {
+    console.warn(`[cleanup] Could not delete ${filePath}:`, err);
+  }
+}
+
+/** Recursively delete a directory — never throws. */
+function safeRmdir(dirPath: string) {
+  try {
+    if (fs.existsSync(dirPath)) {
+      fs.rmSync(dirPath, { recursive: true, force: true });
+      console.log(`[cleanup] Deleted dir: ${dirPath}`);
+    }
+  } catch (err) {
+    console.warn(`[cleanup] Could not delete dir ${dirPath}:`, err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline
+// ---------------------------------------------------------------------------
 
 export async function runPipeline(data: any) {
   const { prompt } = data;
@@ -19,6 +52,8 @@ export async function runPipeline(data: any) {
   console.log("Running pipeline for:", prompt);
   let log = "";
   log += "Starting pipeline\n";
+
+  // ── 1. Structure ──────────────────────────────────────────────────────────
   const structuredPrompt = buildStructuringPrompt(prompt);
   const structRes = await callLLM(structuredPrompt);
   const cleanedStruct = cleanJSON(structRes.content);
@@ -34,6 +69,7 @@ export async function runPipeline(data: any) {
   log += "Structuring completed\n";
   console.log("Structured data:", structuredData);
 
+  // ── 2. Scene planning ─────────────────────────────────────────────────────
   const scenePrompt = buildScenePrompt(structuredData);
   const sceneRes = await callLLM(scenePrompt);
   const cleaned = cleanJSON(sceneRes.content);
@@ -53,10 +89,11 @@ export async function runPipeline(data: any) {
     throw new Error("Scene JSON failed");
   }
 
+  // ── 3. Generate scene Python files ───────────────────────────────────────
   const outputDir = path.join(process.cwd(), "generated");
 
   if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir);
+    fs.mkdirSync(outputDir, { recursive: true });
   }
 
   const sceneFiles: string[] = [];
@@ -69,6 +106,12 @@ export async function runPipeline(data: any) {
     const manimPrompt = buildManimPrompt(scene, i + 1);
     const codeRes = await callLLM(manimPrompt);
     const code = cleanCode(codeRes.content);
+    const validation = validateCode(code);
+
+    if (!validation.valid) {
+      console.error("Validation Failed:", validation.errors);
+      continue;
+    }
 
     console.log(`Scene ${i + 1} code:\n`, code);
 
@@ -77,68 +120,88 @@ export async function runPipeline(data: any) {
 
     fs.writeFileSync(filePath, code);
 
+    console.log("Validated Scene Code:");
+    console.log(code);
     console.log(`Saved: ${filePath}`);
 
     sceneFiles.push(filePath);
   }
 
-  log += "Scenes genrated\n";
+  log += "Scenes generated\n";
+
+  // ── 4. Render each scene with manim ──────────────────────────────────────
+  //
+  // The worker process runs INSIDE the Docker image (which has manim installed),
+  // so we call `manim` directly — no nested `docker run` needed.
+  // Paths are local to the container's working directory (/app in production,
+  // or the project root when running on the host for development).
 
   const videoPaths: string[] = [];
+  const mediaDir = path.join(process.cwd(), "media");
 
   for (let i = 0; i < sceneFiles.length; i++) {
     const filePath = sceneFiles[i];
+    const baseName = path.basename(filePath, ".py"); // e.g. "scene1"
     const sceneName = `Scene${i + 1}`;
 
     console.log(`\n--- Rendering ${sceneName} ---`);
 
     try {
-      execSync(`manim ${filePath} ${sceneName} -ql --disable_caching`, {
+      execSync(`manim "${filePath}" ${sceneName} -ql`, {
         stdio: "inherit",
+        cwd: process.cwd(),
       });
 
-      const videoPath = `media/videos/${path.basename(
-        filePath,
-        ".py"
-      )}/480p15/${sceneName}.mp4`;
+      // manim writes output to: media/videos/<baseName>/480p15/<SceneName>.mp4
+      const videoPath = path.join(
+        mediaDir,
+        "videos",
+        baseName,
+        "480p15",
+        `${sceneName}.mp4`
+      );
 
       console.log(`Rendered: ${videoPath}`);
-
       videoPaths.push(videoPath);
     } catch (err) {
       console.error(`Scene ${sceneName} failed, skipping...`);
-      continue;
+    } finally {
+      // Delete the generated Python file regardless of render outcome
+      safeUnlink(filePath);
     }
   }
 
   log += "Rendering complete\n";
 
-  const concatFilePath = path.join(process.cwd(), "generated", "concat.txt");
-
-  let concatContent = "";
-
-  if (videoPaths.length == 0) {
+  if (videoPaths.length === 0) {
     throw new Error("All scenes failed, no video generated");
   }
 
+  // ── 5. Concatenate scenes with ffmpeg ─────────────────────────────────────
+  const concatFilePath = path.join(outputDir, "concat.txt");
+
+  let concatContent = "";
   for (const videoPath of videoPaths) {
-    concatContent += `file '${path.resolve(videoPath)}'\n`;
+    concatContent += `file '${videoPath}'\n`;
   }
 
   fs.writeFileSync(concatFilePath, concatContent);
-
   console.log("Concat file created:", concatFilePath);
 
-  const fileName = `final-${Date.now()}.mp4`;
+  const finalFileName = `final-${Date.now()}.mp4`;
+  const publicVideosDir = path.join(process.cwd(), "public", "videos");
 
-  const finalOutputPath = path.join(process.cwd(), "public/videos", fileName);
-  console.log("Final video created:", finalOutputPath);
+  if (!fs.existsSync(publicVideosDir)) {
+    fs.mkdirSync(publicVideosDir, { recursive: true });
+  }
+
+  const finalOutputPath = path.join(publicVideosDir, finalFileName);
 
   try {
     console.log("\n--- Merging videos ---");
 
     execSync(
-      `ffmpeg -f concat -safe 0 -i ${concatFilePath} -c copy ${finalOutputPath}`,
+      `ffmpeg -f concat -safe 0 -i "${concatFilePath}" -c copy "${finalOutputPath}"`,
       { stdio: "inherit" }
     );
 
@@ -146,17 +209,37 @@ export async function runPipeline(data: any) {
   } catch (err) {
     console.error("FFmpeg merge failed");
     throw err;
+  } finally {
+    // Clean up concat manifest
+    safeUnlink(concatFilePath);
+
+    // Clean up individual scene mp4 clips
+    for (const videoPath of videoPaths) {
+      safeUnlink(videoPath);
+    }
+
+    // Clean up the per-scene media subdirectories left by manim
+    for (let i = 0; i < sceneFiles.length; i++) {
+      const baseName = path.basename(sceneFiles[i], ".py");
+      safeRmdir(path.join(mediaDir, "videos", baseName));
+    }
   }
 
   log += "Video merge\n";
 
+  // ── 6. Upload to S3 ───────────────────────────────────────────────────────
   console.log("\n--- Uploading to S3 ---");
 
-  const s3FileName = `videos/${fileName}`;
+  const s3FileName = `videos/${finalFileName}`;
+  let s3Url: string;
 
-  const s3Url = await uploadToS3(finalOutputPath, s3FileName);
-
-  console.log("Uploaded to S3:", s3Url);
+  try {
+    s3Url = await uploadToS3(finalOutputPath, s3FileName);
+    console.log("Uploaded to S3:", s3Url);
+  } finally {
+    // Delete the local merged mp4 — it now lives on S3
+    safeUnlink(finalOutputPath);
+  }
 
   await prisma.videoJob.update({
     where: { id: data.jobId },
@@ -164,26 +247,8 @@ export async function runPipeline(data: any) {
   });
 
   return {
-    videoUrl: s3Url,
-    //videoUrl: `/public/final.mp4`,
+    videoUrl: s3Url!,
     structuredData,
     scenes,
-    //sceneFiles,
-    //videoPaths,
   };
 }
-// const firstScene = scenes[0]
-// const manimPrompt = buildManimPrompt(firstScene, 1);
-// const codeRes = await callLLM(manimPrompt)
-// const rawcCode = codeRes.content;
-// const cleanedCode = cleanCode(rawcCode)
-
-// console.log("MANIM CODE RAW:", codeRes.content);
-// console.log("CLEANED MANIM CODE:\n", cleanedCode);
-
-// console.log("Scenes:", scenes);
-
-// const filePath = path.join(process.cwd(), `scene1.py`)
-// fs.writeFileSync(filePath, cleanedCode)
-
-// console.log("Saved Manim file:", filePath);
