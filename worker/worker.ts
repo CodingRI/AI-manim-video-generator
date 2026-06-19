@@ -90,9 +90,10 @@ const worker = new Worker(
   },
   {  
     connection: createRedisConnection(),
-    concurrency: 2,
+    concurrency: 1,
     maxStalledCount: 1,
-    drainDelay: 60, 
+    drainDelay: 60,
+    lockDuration: 600000,
    }
 );
 
