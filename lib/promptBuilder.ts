@@ -114,9 +114,13 @@ Create scenes that flow naturally from introduction to conclusion.
 `;
 }
 
-export function buildManimPrompt(scene: any, index: number): string {
+export function buildManimPrompt(scene: any, index: number, retrievedContext: string): string {
   return `
 You are an expert Manim Community Edition v0.20.0 developer.
+
+Relevant Manim Knowledge:
+
+${retrievedContext}
 
 Generate ONLY executable Python code.
 
