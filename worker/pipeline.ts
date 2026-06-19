@@ -8,6 +8,7 @@ import {
 import { ScenesArraySchema } from "@/lib/schema";
 import { generateSceneCode } from "@/lib/template";
 import { validateCode } from "@/lib/validateCode";
+import {retrieveKnowledge} from "@/src/rag/retriever";
 import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
@@ -103,7 +104,31 @@ export async function runPipeline(data: any) {
 
     console.log(`\n--- Generating Scene ${i + 1} (AI) ---`);
 
-    const manimPrompt = buildManimPrompt(scene, i + 1);
+
+  //RAG retrieval
+
+  const retrievalQuery = `
+${scene.title}
+
+${scene.explanation}
+
+${scene.visual}
+`;
+    const retrieved =
+      await retrieveKnowledge(
+        retrievalQuery,
+        5
+      );
+
+    
+    console.log(
+      "Retrieved Chunks:",
+      retrieved.map((r: any) => r.title)
+    );
+    
+    const retrievedContext = retrieved.map((r: any) => `SOURCE: ${r.title}\n${r.content}`).join("\n\n");
+
+    const manimPrompt = buildManimPrompt(scene, i + 1, retrievedContext);
     const codeRes = await callLLM(manimPrompt);
     const code = cleanCode(codeRes.content);
     const validation = validateCode(code);
