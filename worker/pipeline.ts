@@ -5,10 +5,11 @@ import {
   buildScenePrompt,
   buildManimPrompt,
 } from "@/lib/promptBuilder";
+import { TaskType } from "@/lib/router";
 import { ScenesArraySchema } from "@/lib/schema";
 import { generateSceneCode } from "@/lib/template";
-import { validateCode } from "@/lib/validateCode";
-import {retrieveKnowledge} from "@/src/rag/retriever";
+import { validateAndRepair } from "@/src/lib/validateAndRepair";
+import { retrieveKnowledge } from "@/src/rag/retriever";
 import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
@@ -56,7 +57,7 @@ export async function runPipeline(data: any) {
 
   // ── 1. Structure ──────────────────────────────────────────────────────────
   const structuredPrompt = buildStructuringPrompt(prompt);
-  const structRes = await callLLM(structuredPrompt);
+  const structRes = await callLLM(structuredPrompt, TaskType.STRUCTURE);
   const cleanedStruct = cleanJSON(structRes.content);
   let structuredData;
   try {
@@ -72,7 +73,7 @@ export async function runPipeline(data: any) {
 
   // ── 2. Scene planning ─────────────────────────────────────────────────────
   const scenePrompt = buildScenePrompt(structuredData);
-  const sceneRes = await callLLM(scenePrompt);
+  const sceneRes = await callLLM(scenePrompt, TaskType.PLAN);
   const cleaned = cleanJSON(sceneRes.content);
 
   let scenes;
@@ -129,24 +130,29 @@ ${scene.visual}
     const retrievedContext = retrieved.map((r: any) => `SOURCE: ${r.title}\n${r.content}`).join("\n\n");
 
     const manimPrompt = buildManimPrompt(scene, i + 1, retrievedContext);
-    const codeRes = await callLLM(manimPrompt);
+    const codeRes = await callLLM(manimPrompt, TaskType.CODE);
     const code = cleanCode(codeRes.content);
-    const validation = validateCode(code);
 
-    if (!validation.valid) {
-      console.error("Validation Failed:", validation.errors);
-      continue;
+    const validation = await validateAndRepair(manimPrompt, code);
+
+    if (!validation.success) {
+      console.error(
+        `[VALIDATION] Scene ${i + 1} failed after repair attempt:`,
+        validation.errors
+      );
+      throw new Error(`Scene ${i + 1} code validation failed after repair`);
     }
 
-    console.log(`Scene ${i + 1} code:\n`, code);
+    const finalCode = validation.code;
+    console.log(`Scene ${i + 1} code:\n`, finalCode);
 
     const fileName = `scene${i + 1}.py`;
     const filePath = path.join(outputDir, fileName);
 
-    fs.writeFileSync(filePath, code);
+    fs.writeFileSync(filePath, finalCode);
 
     console.log("Validated Scene Code:");
-    console.log(code);
+    console.log(finalCode);
     console.log(`Saved: ${filePath}`);
 
     sceneFiles.push(filePath);
@@ -169,7 +175,7 @@ ${scene.visual}
     const baseName = path.basename(filePath, ".py"); // e.g. "scene1"
     const sceneName = `Scene${i + 1}`;
 
-    console.log(`\n--- Rendering ${sceneName} ---`);
+    console.log(`[RENDER] Starting scene ${sceneName}`);
 
     try {
       execSync(`manim "${filePath}" ${sceneName} -ql`, {
