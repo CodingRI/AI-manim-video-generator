@@ -63,7 +63,7 @@ The biggest complexity while building this pipeline to work robustly was to hand
 
 ## Demo
 
-*(Insert Screen Recording Demo Here - Live generation logs on Railway)*
+
 
 ## Roadmap
 
