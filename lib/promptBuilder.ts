@@ -114,14 +114,15 @@ Create scenes that flow naturally from introduction to conclusion.
 `;
 }
 
-export function buildManimPrompt(scene: any, index: number, retrievedContext: string): string {
+export function buildManimPrompt(scene: any, index: number, retrievedContext: string = ""): string {
+  const knowledgeBlock = retrievedContext.trim()
+    ? `Relevant Manim Knowledge:\n\n${retrievedContext}\n`
+    : "";
+
   return `
 You are an expert Manim Community Edition v0.20.0 developer.
 
-Relevant Manim Knowledge:
-
-${retrievedContext}
-
+${knowledgeBlock}
 Generate ONLY executable Python code.
 
 CRITICAL OUTPUT RULES:

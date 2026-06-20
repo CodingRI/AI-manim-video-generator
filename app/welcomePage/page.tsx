@@ -1199,7 +1199,7 @@ const [playingIdx, setPlayingIdx] = useState<number | null>(null);
               </button>
             ))}
             <button
-              onClick={() => window.open("https://github.com", "_blank")}
+              onClick={() => window.open("https://github.com/CodingRI/AI-manim-video-generator", "_blank")}
               className="flex items-center gap-2 px-3 py-2 text-xs text-neutral-500 hover:text-neutral-200 rounded-lg hover:bg-neutral-800/50 transition-colors ml-1"
             >
               <Github size={13} />
